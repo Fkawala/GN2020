@@ -5,7 +5,7 @@ import click
 from click_shell import shell
 import threading
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = 'vnkdjnfjknfl1232#'
 socketio = SocketIO(app, async_mode="threading")
 clients = []
