@@ -56,7 +56,7 @@ def intro():
         bold=True,
         fg='red')
 
-    for line in random_lines(1200, 60):
+    for line in random_lines(2400, 60):
         click.secho(line, fg='blue')
         time.sleep(.2 * random.random())
 
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     if saved_slots is not None:
         slots = saved_slots
     logging.basicConfig(filename='.error.log', level=logging.DEBUG)
-    threading.Thread(target=socketio.run, args=(app,)).start()
+    threading.Thread(target=socketio.run, kwargs={"app":app, "host": "0.0.0.0"}).start()
     time.sleep(1)
     my_app.shell.nocommand = help
     my_app()
