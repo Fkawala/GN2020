@@ -4,6 +4,7 @@ import string
 import click
 import threading
 import os
+import pickle
 
 from more_itertools import chunked
 from flask import Flask, render_template, copy_current_request_context, request
@@ -16,6 +17,14 @@ app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = '1833GX-L'
 socketio = SocketIO(app, async_mode="threading")
 clients = []
+slots = {
+    "endommagé":
+        {'LAX-1', 'PAX-22', 'OAX-30', 'LAX-4', 'LAX-51',
+         'LAX-6', 'LAX-07', 'LAX-81', 'LAX-99'},
+    "détruit": {'LAX-10'},
+    "occupé": set(),
+    "disponible": {'LAX-11', 'LAX-0', 'LAX-7', 'KAX-2', 'LAX-15'}}
+
 station_name = "station 1833GX-L"
 prompt = f'{station_name} > '
 ai_id = 'T22XF'
@@ -24,6 +33,12 @@ help = f"La commande \033[91m\033[1m%s\033[0m ne peut pas être exécutée" + \
        f" par {station_name}. Tapez \033[91m\033[1mhelp\033[0m pour obtenir" + \
        f" la liste des commandes disponibles sur {station_name}."
 
+def load_slots(path=""):
+    try:
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    except Exception:
+        return None
 
 def messageReceived(methods=['GET', 'POST']):
     print('message was received!!!')
@@ -67,6 +82,34 @@ def start_cryo(json, methods=['GET', 'POST']):
     nb_seconds = int(json["nb_seconds"])
     os.system(f"./cryo_cd.sh {nb_seconds}s")
 
+@socketio.on('cmd')
+def start_cryo(json, methods=['GET', 'POST']):
+    command = json["command"]
+    os.system(command)
+
+@socketio.on('power')
+def power(json, methods=['GET', 'POST']):
+    battery = int(json["power_qty"])
+    print(battery)
+
+@socketio.on('slots')
+def power(json, methods=['GET', 'POST']):
+    action = json["action"].strip().lower()
+    if action == "destroy":
+        slots["détruit"].add(slots["endommagé"].pop())
+    elif action == "repair":
+        slots["disponible"].add(slots["endommagé"].pop())
+    if action == "dammage":
+        slots["endommagé"].add(slots["disponible"].pop())
+    if action == "busy":
+        slots["occupé"].add(slots["disponible"].pop())
+    if action == "release":
+        slots["disponible"].add(slots["occupé"].pop())
+
+    with open(".slots", "wb") as f:
+        pickle.dump(slots, f)
+
+
 @socketio.on('my event')
 def handle_my_custom_event(json, methods=['GET', 'POST']):
     msg = f'\n{prompt}Nouveau message de IA-{ai_id}: \033[1m{json["message"]}\033[0m'
@@ -100,12 +143,16 @@ def cryogen(x):
     pass
 
 @my_app.command()
-def status_source_energie(x):
-    pass
+def status_energie(x):
+    if click.confirm('Confirmez que vous voulez évaluer l\'énergie restante'):
+        print("ok")
 
 if __name__ == '__main__':
     import logging
-    logging.basicConfig(filename='.error.log',level=logging.ERROR)
+    saved_slots = load_slots(".slots")
+    if saved_slots is not None:
+        slots = saved_slots
+    logging.basicConfig(filename='.error.log', level=logging.DEBUG)
     threading.Thread(target=socketio.run, args=(app,)).start()
     time.sleep(1)
     my_app.shell.nocommand = help

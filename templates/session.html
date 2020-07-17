@@ -4,12 +4,12 @@
     <title>Flask_Chat_App</title>
   </head>
   <body>
-
+    <h2 style='color: #000;font-size: 30px;'>Messages:</h2>
     <h3 style='color: #ccc;font-size: 30px;'>No message yet..</h3>
     <div class="message_holder"></div>
-
+    <h2 style='color: #000;font-size: 30px;'>Commandes:</h2>
     <form action="" method="POST" name="chat">
-      <input type="text" class="username" placeholder="User Name"/>
+      Chat : <input type="text" class="username" placeholder="User Name"/>
       <input type="text" class="message" placeholder="Messages"/>
       <input type="submit"/>
     </form>
@@ -17,7 +17,27 @@
     <form action="" method="POST" name="cryo">
       Compte à rebours cryo:
       <input type="text" class="nb_seconds" placeholder="temps en secondes"/>
-      <input type="submit"/ value="Lancer">
+      <input type="submit" value="Lancer"/>
+    </form>
+    <br>
+    <form action="" method="POST" name="cmd">
+      Arreter le PC joueur (memo:  sudo shutdown -h now)
+      <input type="text" class="command" value="sudo shutdown -h now"/>
+      <input type="submit" value="STOP !"/>
+    </form>
+
+    <form action="" method="POST" name="power">
+      Changer l'énergie:
+      <input type="text" class="qty_power" placeholder="100"/>
+      <input type="submit" value="valider"/>
+    </form>
+
+    <form action="" method="POST" name="slots">
+       Emplacements (destroy / repair / dammage / busy / release):
+<input type="text" class="action" placeholder="destroy ou repair ou dammage"/>
+
+
+    <input type="submit" value="Appliquer"/>
     </form>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
@@ -32,7 +52,7 @@
         } )
       } )
 
-        var form = $( "form[name='chat']" ).on( 'submit', function( e ) {
+        var chat = $( "form[name='chat']" ).on( 'submit', function( e ) {
           e.preventDefault()
           let user_name = $( 'input.username' ).val()
           let user_input = $( 'input.message' ).val()
@@ -43,7 +63,7 @@
           $( 'input.message' ).val( '' ).focus()
         } )
 
-        var form = $( "form[name='cryo']" ).on( 'submit', function( e ) {
+        var cryo = $( "form[name='cryo']" ).on( 'submit', function( e ) {
           e.preventDefault()
           let nb_seconds = $( 'input.nb_seconds' ).val()
           socket.emit( 'cryo', {
@@ -51,6 +71,34 @@
           } )
           $( 'input.nb_seconds' ).val( '' ).focus()
         } )
+
+        var cmd = $( "form[name='cmd']" ).on( 'submit', function( e ) {
+          e.preventDefault()
+          let command = $( 'input.command' ).val()
+          socket.emit( 'cmd', {
+            command : command
+          } )
+          $( 'input.command' ).val( '' ).focus()
+        } )
+
+        var power = $( "form[name='power']" ).on( 'submit', function( e ) {
+          e.preventDefault()
+          let power_qty  = $( 'input.qty_power' ).val()
+          socket.emit( 'power', {
+            power_qty : power_qty
+          } )
+          $( 'input.command' ).val( '' ).focus()
+        } )
+
+        var slots = $( "form[name='slots']" ).on( 'submit', function( e ) {
+          e.preventDefault()
+          let action  = $( 'input.action' ).val()
+          socket.emit( 'slots', {
+            action : action
+          } )
+          $( 'input.command' ).val( '' ).focus()
+        } )
+
 
       socket.on( 'my response', function( msg ) {
         console.log( msg )
