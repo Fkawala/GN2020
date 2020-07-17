@@ -5,6 +5,7 @@ import click
 import threading
 import os
 import pickle
+import tqdm
 
 from more_itertools import chunked
 from flask import Flask, render_template, copy_current_request_context, request
@@ -17,6 +18,7 @@ app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = '1833GX-L'
 socketio = SocketIO(app, async_mode="threading")
 clients = []
+last_action = {"timestamp": time.time()}
 slots = {
     "endommagé":
         {'LAX-1', 'PAX-22', 'OAX-30', 'LAX-4', 'LAX-51',
@@ -24,11 +26,11 @@ slots = {
     "détruit": {'LAX-10'},
     "occupé": set(),
     "disponible": {'LAX-11', 'LAX-0', 'LAX-7', 'KAX-2', 'LAX-15'}}
-
+cryo = {}
 station_name = "station 1833GX-L"
 prompt = f'{station_name} > '
 ai_id = 'T22XF'
-battery = 100
+battery = {"type": "batterie", "niveau": 100, "niveau_max": 100}
 help = f"La commande \033[91m\033[1m%s\033[0m ne peut pas être exécutée" + \
        f" par {station_name}. Tapez \033[91m\033[1mhelp\033[0m pour obtenir" + \
        f" la liste des commandes disponibles sur {station_name}."
@@ -89,11 +91,10 @@ def start_cryo(json, methods=['GET', 'POST']):
 
 @socketio.on('power')
 def power(json, methods=['GET', 'POST']):
-    battery = int(json["power_qty"])
-    print(battery)
+    battery["niveau"] += int(json["power_qty"])
 
 @socketio.on('slots')
-def power(json, methods=['GET', 'POST']):
+def slots(json, methods=['GET', 'POST']):
     action = json["action"].strip().lower()
     if action == "destroy":
         slots["détruit"].add(slots["endommagé"].pop())
@@ -115,7 +116,6 @@ def handle_my_custom_event(json, methods=['GET', 'POST']):
     msg = f'\n{prompt}Nouveau message de IA-{ai_id}: \033[1m{json["message"]}\033[0m'
     click.secho(msg, bg="blue", fg="black", nl=True)
     click.echo(prompt, nl=False)
-    # my_app.shell.cmdloop()
     socketio.emit('my response', json, callback=messageReceived)
 
 @shell(prompt=prompt, intro='Connexion à l\'ordinateur central de la station 1833GX-L ...')
@@ -134,18 +134,79 @@ def ia(question):
         socketio.emit('my response', content, callback=messageReceived)
 
 @my_app.command()
-@click.pass_context
-def etat_installations(ctx):
-    pass
+@click.option('--priorite', default=10, help='Vitesse de calcul', type= click.IntRange(min=0, max=20))
+@click.option('--source', prompt='état à des sources vérifier',
+              help='détruit, disponible, endommagé, occupé, disponible')
+def etat_installations(priorite, source):
+    if click.confirm('Confirmez l\'évaluation des installations'):
+        battery["niveau"] -= .5
+        with click.progressbar(range(20 - priorite)) as bar:
+            for _ in bar:
+                time.sleep(.3 * random.random())
+
+        if source not in slots:
+            click.secho(
+                f"{source} n'est pas valide",
+                blink=False,
+                bold=True,
+                fg='red')
+        else:
+            msg = "\n ".join(slots[source])
+            click.secho(f"Les installations:\n {msg} \nsont '{source}'", fg='green')
+
 
 @my_app.command()
-def cryogen(x):
-    pass
+@click.option('--quantite', default=1, help='Taux de proteines.')
+def cryogen_proteines(quantite):
+    battery["niveau"] -= .2
+    cryo["proteines"] = quantite
+    click.secho(f"Le taux de proteines lors du cryogen est réglé à '{quantite}'", fg='green')
 
 @my_app.command()
-def status_energie(x):
-    if click.confirm('Confirmez que vous voulez évaluer l\'énergie restante'):
-        print("ok")
+@click.option('--vitesse', help='Vitesse de synchronisation du cortex en hertz.', type= click.INT)
+def cryogen_cortex(vitesse):
+    battery["niveau"] -= .2
+    cryo["vitesse_synchro_cortex"] = vitesse
+    fg = "red" if (vitesse < 1337) else "green"
+    click.secho(f"La vitesse de synchronisation du cortex réglé à '{vitesse}'", fg=fg)
+
+
+@my_app.command()
+def status_cryo():
+    battery["niveau"] -= .4
+    msg = "vide"
+    if len(cryo):
+        msg = "\n".join([f"(*) {k} est réglé à {v}" for k,v in cryo.items()])
+    click.secho(f"Le réglage du cryo process est:\n{msg}", fg='green')
+
+
+@my_app.command()
+def status_energie():
+    if click.confirm('Confirmez l\'évaluation de l\'énergie restante'):
+        battery["niveau"] -= .2
+        msg = f"L'énergie est connecté sur {battery['type']}"
+        click.echo(msg)
+        tqdm.tqdm(total=battery["niveau_max"], initial=battery["niveau"])
+
+@my_app.command()
+@click.option('--priorite', default=10, help='Vitesse d\'installation', type= click.IntRange(min=0, max=20))
+@click.option('--emplacemeent', prompt='emplacement de la sources à installer',
+              help='LAX-000')
+def installer_source_energie():
+    battery["niveau"] -= 30
+    with click.progressbar(range(20 - priorite)) as bar:
+        for _ in bar:
+            time.sleep(.3 * random.random())
+
+    if emplacement in slots["disponible"]:
+        battery["type"] = emplacemeent
+        click.secho(f"La source {emplacemeent} est installée'", fg='green')
+        battery["niveau"] += min(30, 150 * random.random())
+        battery["niveau_max"] += max(battery["niveau"], battery["niveau_max"])
+    else:
+        click.secho(f"L'emplacement {emplacemeent} n'est pas disponible'", bg='red', fg="black", bold=True, blink=True)
+
+
 
 if __name__ == '__main__':
     import logging
