@@ -56,7 +56,7 @@ def intro():
         bold=True,
         fg='red')
 
-    for line in random_lines(120, 60):
+    for line in random_lines(1200, 60):
         click.secho(line, fg='blue')
         time.sleep(.2 * random.random())
 
@@ -82,7 +82,7 @@ def handle_client_connected_event(username, methods=['GET', 'POST']):
 @socketio.on('cryo')
 def start_cryo(json, methods=['GET', 'POST']):
     nb_seconds = int(json["nb_seconds"])
-    os.system(f"./cryo_cd.sh {nb_seconds}s")
+    os.system(f"/home/pi/cryo_cd.sh {nb_seconds}s")
 
 @socketio.on('cmd')
 def start_cryo(json, methods=['GET', 'POST']):
