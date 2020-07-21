@@ -33,8 +33,9 @@
     </form>
 
     <form action="" method="POST" name="slots">
-       Emplacements (destroy / repair / dammage / busy / release):
-<input type="text" class="action" placeholder="destroy ou repair ou dammage"/>
+       Emplacements:
+Nom <input type="text" class="slot_name" placeholder="LAX-1"/>
+Status <input type="text" class="action" placeholder="endommagé, détruit, occupé, disponible"/>
 
 
     <input type="submit" value="Appliquer"/>
@@ -93,8 +94,10 @@
         var slots = $( "form[name='slots']" ).on( 'submit', function( e ) {
           e.preventDefault()
           let action  = $( 'input.action' ).val()
+          let slot_name  = $( 'input.slot_name' ).val()
           socket.emit( 'slots', {
-            action : action
+            action : action,
+            slot_name : slot_name
           } )
           $( 'input.command' ).val( '' ).focus()
         } )

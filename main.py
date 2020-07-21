@@ -7,6 +7,7 @@ import os
 import pickle
 import tqdm
 
+from collections import ChainMap
 from more_itertools import chunked
 from flask import Flask, render_template, copy_current_request_context, request
 from flask_socketio import SocketIO
@@ -16,6 +17,7 @@ from pyfiglet import Figlet
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SECRET_KEY'] = '1833GX-L'
+app.config['JSON_AS_ASCII'] = False
 socketio = SocketIO(app, async_mode="threading")
 clients = []
 last_action = {"timestamp": time.time()}
@@ -26,6 +28,7 @@ slots = {
     "détruit": {'LAX-10'},
     "occupé": set(),
     "disponible": {'LAX-11', 'LAX-0', 'LAX-7', 'KAX-2', 'LAX-15'}}
+slots_status = dict(ChainMap(*[{slot: status for slot in slots} for (status, slots) in slots.items()]))
 cryo = {}
 station_name = "station 1833GX-L"
 prompt = f'{station_name} > '
@@ -56,7 +59,7 @@ def intro():
         bold=True,
         fg='red')
 
-    for line in random_lines(2400, 60):
+    for line in random_lines(1800, 60):
         click.secho(line, fg='blue')
         time.sleep(.2 * random.random())
 
@@ -94,22 +97,22 @@ def power(json, methods=['GET', 'POST']):
     battery["niveau"] += int(json["power_qty"])
 
 @socketio.on('slots')
-def slots(json, methods=['GET', 'POST']):
-    action = json["action"].strip().lower()
-    if action == "destroy":
-        slots["détruit"].add(slots["endommagé"].pop())
-    elif action == "repair":
-        slots["disponible"].add(slots["endommagé"].pop())
-    if action == "dammage":
-        slots["endommagé"].add(slots["disponible"].pop())
-    if action == "busy":
-        slots["occupé"].add(slots["disponible"].pop())
-    if action == "release":
-        slots["disponible"].add(slots["occupé"].pop())
+def update_slots(json, methods=['GET', 'POST']):
+    name = json["slot_name"].strip()
+    action = json["action"].encode('latin-1').decode('utf-8').strip().lower()
 
-    with open(".slots", "wb") as f:
-        pickle.dump(slots, f)
-
+    try:
+        slots[slots_status[name]].remove(name)
+        slots[action].add(name)
+        slots_status.update(dict(ChainMap(*[{slot: status for slot in slots} for (status, slots) in slots.items()])))
+        with open(".slots", "wb") as f:
+            pickle.dump(slots, f)
+    except Exception:
+        click.secho(
+            f"Le changement d'état pour la source {name} " + \
+            f"à échoué. Contactez l'IA {ai_id}",
+            fg='red', bg='white', blink=True)
+        click.echo(prompt, nl=False)
 
 @socketio.on('my event')
 def handle_my_custom_event(json, methods=['GET', 'POST']):
@@ -213,6 +216,7 @@ if __name__ == '__main__':
     saved_slots = load_slots(".slots")
     if saved_slots is not None:
         slots = saved_slots
+        slots_status = dict(ChainMap(*[{slot: status for slot in slots} for (status, slots) in slots.items()]))
     logging.basicConfig(filename='.error.log', level=logging.DEBUG)
     threading.Thread(target=socketio.run, kwargs={"app":app, "host": "0.0.0.0"}).start()
     time.sleep(1)
