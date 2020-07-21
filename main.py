@@ -130,7 +130,7 @@ def my_app():
 # @click.argument('query')
 def ia(question):
     content = {
-        "user_name": "joueur",
+        "user_name": "Un Joux demande à l'IA >",
         "message": " ".join(question)
     }
     with app.test_request_context('/'):
@@ -139,7 +139,7 @@ def ia(question):
 @my_app.command()
 @click.option('--priorite', default=10, help='Vitesse de calcul', type= click.IntRange(min=0, max=20))
 @click.option('--source', prompt='état à des sources vérifier',
-              help='détruit, disponible, endommagé, occupé, disponible')
+              help='détruit, disponible, endommagé, occupé')
 def etat_installations(priorite, source):
     if click.confirm('Confirmez l\'évaluation des installations'):
         battery["niveau"] -= .5
@@ -192,34 +192,44 @@ def status_energie():
         tqdm.tqdm(total=battery["niveau_max"], initial=battery["niveau"])
 
 @my_app.command()
-@click.option('--priorite', default=10, help='Vitesse d\'installation', type= click.IntRange(min=0, max=20))
-@click.option('--emplacemeent', prompt='emplacement de la sources à installer',
-              help='LAX-000')
-def installer_source_energie():
+@click.option('--priorite', help='Priorite de l\'installation', type= click.IntRange(min=0, max=20), required=True, prompt="Indiquez la priorité de l'installation entre 0 et 20 puis validez")
+@click.option('--emplacement', help='Emplacement de la source à installer, par exemple LAX-000', type=click.STRING, required=True)
+def installer_source_energie(priorite, emplacement):
     battery["niveau"] -= 30
-    with click.progressbar(range(20 - priorite)) as bar:
+    with click.progressbar(range(30 - priorite)) as bar:
         for _ in bar:
             time.sleep(.3 * random.random())
 
     if emplacement in slots["disponible"]:
-        battery["type"] = emplacemeent
-        click.secho(f"La source {emplacemeent} est installée'", fg='green')
+        battery["type"] = emplacement
+        click.secho(f"La source {emplacement} est installée'", fg='green')
         battery["niveau"] += min(30, 150 * random.random())
         battery["niveau_max"] += max(battery["niveau"], battery["niveau_max"])
     else:
-        click.secho(f"L'emplacement {emplacemeent} n'est pas disponible'", bg='red', fg="black", bold=True, blink=True)
+        click.secho(f"L'emplacement {emplacement} n'est pas disponible", bg='white', fg="red", bold=True, blink=True)
 
+def precmd(line):
+    content = {
+        "user_name": "Un Joux a saisi >",
+        "message": line
+    }
+    if not line.startswith("ia"):
+        with app.test_request_context('/'):
+            socketio.emit('my response', content, callback=messageReceived)
 
+    return line
 
 if __name__ == '__main__':
     import logging
     saved_slots = load_slots(".slots")
     if saved_slots is not None:
         slots = saved_slots
-        slots_status = dict(ChainMap(*[{slot: status for slot in slots} for (status, slots) in slots.items()]))
+        slots_status = dict(ChainMap(*[{slot: status for slot in slots}
+            for (status, slots) in slots.items()]))
     logging.basicConfig(filename='.error.log', level=logging.DEBUG)
     threading.Thread(target=socketio.run, kwargs={"app":app, "host": "0.0.0.0"}).start()
     time.sleep(1)
     my_app.shell.nocommand = help
+    my_app.shell.precmd = precmd
     my_app()
     # my_app.nocommand = "La commande %s n'existe pas."
